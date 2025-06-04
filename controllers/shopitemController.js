@@ -14,8 +14,8 @@ class ShopItemController {
         const item = await ShopItem.create({name,price,brandId,typeId,img:filename})
         if (info) {
             info = JSON.parse(info)
-            info.forEach(element => {
-                ItemInfo.create({
+            info.forEach(async element => {
+                await ItemInfo.create({
                     title:element.title,
                     description:element.description,
                     diviceId:item.id
@@ -33,7 +33,7 @@ class ShopItemController {
     async delete (req,res,next) {
         try {
             const {id} = req.params
-            const item = ShopItem.destroy({where:{id}})
+            const item = await ShopItem.destroy({where:{id}})
             if(!item) {
                 next(ApiError.badRequest('Не удаллоись найти предмет'))
             }
@@ -47,19 +47,14 @@ class ShopItemController {
         page = page || 1
         limit = limit || 9
         let offset = page * limit - limit
-        let items;
-        if (!brandId && !typeId) {
-            items = await ShopItem.findAndCountAll({limit, offset})
-        }
-        if (brandId && !typeId) {
-            items = await ShopItem.findAndCountAll({where:{brandId}, limit, offset})
-        }
-        if (!brandId && typeId) {
-            items = await ShopItem.findAndCountAll({where:{typeId}, limit, offset})
-        }
-        if (brandId && typeId) {
-            items = await ShopItem.findAndCountAll({where:{typeId, brandId}, limit, offset})
-        }
+        let where = {}
+        if(brandId) where.brandId = brandId
+        if(typeId) where.typeId = typeId
+        const items = await ShopItem.findAndCountAll({
+            where: Object.keys(where).length ? where : undefined,
+            limit,
+            offset,
+        })
         return res.json(items)
     }
     async getOne(req, res) {
