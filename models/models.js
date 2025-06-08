@@ -35,7 +35,19 @@ const Rating = sequelize.define('rating',{
 })
 const ItemInfo = sequelize.define('item_info',{
     id:{type:DataTypes.INTEGER,primaryKey:true,autoIncrement:true},
-    title:{type:DataTypes.STRING,allowNull:false}
+    title:{type:DataTypes.STRING,allowNull:false},
+    description:{type:DataTypes.TEXT}
+})
+const BlackListedToken = sequelize.define('BlackListedToken',{
+    token:{
+        type:DataTypes.STRING,
+        allowNull:false,
+        unique:true
+    },
+    expiresAt:{
+        type:DataTypes.DATE,
+        allowNull:false
+    }
 })
 
 const TypeBrand = sequelize.define('type_brand',{
@@ -79,5 +91,6 @@ module.exports  = {
     Brand,
     Rating,
     ItemInfo,
-    TypeBrand
+    TypeBrand,
+    BlackListedToken
 }
