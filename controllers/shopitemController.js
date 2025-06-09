@@ -6,9 +6,12 @@ class ShopItemController {
   async create(req, res, next) {
     try {
       const { name, price, brandId, typeId, info } = req.body;
-      const { img } = req.files;
+      const { img } = req.files || {};
+      if(!img) {
+        return next(ApiError.badRequest('Файл не указан'))
+      }
       let filename = uuid.v4() + ".jpg";
-      img.mv(path.resolve(__dirname, "..", "static", filename));
+      await img.mv(path.resolve(__dirname, "..", "static", filename));
       const item = await ShopItem.create({
         name,
         price,
