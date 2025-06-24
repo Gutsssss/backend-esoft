@@ -35,14 +35,12 @@ class UserController {
   }
   async addToBasket(req, res, next) {
     try {
-      const { id } = req.params; // User ID
-      const { name } = req.body; // Product name
+      const { id } = req.params;
+      const { name } = req.body;
 
       if (!id) {
         return next(ApiError.badRequest("Пользователь не найден"));
       }
-
-      // Find the user and their basket
       const user = await User.findOne({ 
         where: { id },
         include: [{
@@ -54,20 +52,14 @@ class UserController {
       if (!user) {
         return next(ApiError.badRequest("Пользователь не найден"));
       }
-
-      // Find or create the user's basket
       let basket = user.Basket;
       if (!basket) {
         basket = await Basket.create({ userId: id });
       }
-
-      // Find the shop item
       const item = await ShopItem.findOne({ where: { name } });
       if (!item) {
         return next(ApiError.badRequest("Товар не найден"));
       }
-
-      // Check if item already exists in basket
       const existingItem = await BasketItem.findOne({
         where: {
           basketId: basket.id,
@@ -76,25 +68,19 @@ class UserController {
       });
 
       if (existingItem) {
-        // If item exists, you might want to increment quantity or return error
         return next(ApiError.badRequest("Товар уже в корзине"));
       }
-
-      // Add item to basket
       await BasketItem.create({
         basketId: basket.id,
         shopItemId: item.id
-        // You can add quantity or other fields here if needed
       });
-
-      // Return updated user with basket and items
       const updatedUser = await User.findOne({
         where: { id },
         include: [{
           model: Basket,
           include: [{
             model: BasketItem,
-            include: [ShopItem] // Include the shop item details
+            include: [ShopItem]
           }]
         }]
       });

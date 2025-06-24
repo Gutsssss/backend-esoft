@@ -63,17 +63,22 @@ class ShopItemController {
     return res.json(items);
   }
   async getOne(req, res, next) {
-    try {
-      const { id } = req.params;
-      const item = await ShopItem.findOne({
-        where: { id },
-        include: [{ model: ItemInfo }],
-      });
-      return res.json(item);
-    } catch (err) {
-      return next(ApiError.internal(err));
+  try {
+    const { id } = req.params;
+    const item = await ShopItem.findOne({
+      where: { id },
+      include: [{ model: ItemInfo, as: 'info' }],
+    });
+
+    if (!item) {
+      return next(ApiError.badRequest("Товар не найден"));
     }
+
+    return res.json(item);
+  } catch (err) {
+    return next(ApiError.internal(err));
   }
+}
 }
 
 module.exports = new ShopItemController();
