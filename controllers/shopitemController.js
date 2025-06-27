@@ -50,7 +50,7 @@ class ShopItemController {
   }
   async searchItems(req, res, next) {
     try {
-      const { name } = req.params; // Теперь получаем из params, а не query
+      const { name } = req.params;
 
       // Проверка на пустой запрос
       if (!name || name.trim() === "") {
@@ -60,7 +60,7 @@ class ShopItemController {
       const items = await ShopItem.findAll({
         where: {
           name: {
-            [Op.iLike]: `%${name}%`, // Регистронезависимый поиск
+            [Op.iLike]: `%${name}%`,
           },
         },
         include: [{ model: ItemInfo, as: "info" }],
