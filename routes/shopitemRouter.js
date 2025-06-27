@@ -5,6 +5,7 @@ const checkRoleMiddleware = require('../middleware/checkRoleMiddleware')
 
 router.post('/',checkRoleMiddleware("ADMIN"),shopItemController.create)
 router.get('/',shopItemController.getAll)
+router.get('/search/:name', shopItemController.searchItems);
 router.get('/:id',shopItemController.getOne)
 router.delete('/:id',checkRoleMiddleware("ADMIN"),shopItemController.delete)
 

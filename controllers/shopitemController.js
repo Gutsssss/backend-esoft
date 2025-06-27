@@ -2,13 +2,14 @@ const uuid = require("uuid");
 const path = require("path");
 const { ShopItem, ItemInfo } = require("../models/models");
 const ApiError = require("../error/ApiError");
+const { Op, json } = require("sequelize");
 class ShopItemController {
   async create(req, res, next) {
     try {
       const { name, price, brandId, typeId, info } = req.body;
       const { img } = req.files || {};
-      if(!img) {
-        return next(ApiError.badRequest('Файл не указан'))
+      if (!img) {
+        return next(ApiError.badRequest("Файл не указан"));
       }
       let filename = uuid.v4() + ".jpg";
       await img.mv(path.resolve(__dirname, "..", "static", filename));
@@ -47,6 +48,30 @@ class ShopItemController {
       return next(ApiError.badRequest("Не удалось удалить"));
     }
   }
+  async searchItems(req, res, next) {
+    try {
+      const { name } = req.params; // Теперь получаем из params, а не query
+
+      // Проверка на пустой запрос
+      if (!name || name.trim() === "") {
+        return res.status(200).json([]);
+      }
+
+      const items = await ShopItem.findAll({
+        where: {
+          name: {
+            [Op.iLike]: `%${name}%`, // Регистронезависимый поиск
+          },
+        },
+        include: [{ model: ItemInfo, as: "info" }],
+      });
+
+      return res.json(items);
+    } catch (err) {
+      console.error("Ошибка поиска:", err);
+      return next(ApiError.internal("Произошла ошибка при поиске товаров"));
+    }
+  }
   async getAll(req, res) {
     let { brandId, typeId, limit, page } = req.query;
     page = page || 1;
@@ -63,22 +88,22 @@ class ShopItemController {
     return res.json(items);
   }
   async getOne(req, res, next) {
-  try {
-    const { id } = req.params;
-    const item = await ShopItem.findOne({
-      where: { id },
-      include: [{ model: ItemInfo, as: 'info' }],
-    });
+    try {
+      const { id } = req.params;
+      const item = await ShopItem.findOne({
+        where: { id },
+        include: [{ model: ItemInfo, as: "info" }],
+      });
 
-    if (!item) {
-      return next(ApiError.badRequest("Товар не найден"));
+      if (!item) {
+        return next(ApiError.badRequest("Товар не найден"));
+      }
+
+      return res.json(item);
+    } catch (err) {
+      return next(ApiError.internal(err));
     }
-
-    return res.json(item);
-  } catch (err) {
-    return next(ApiError.internal(err));
   }
-}
 }
 
 module.exports = new ShopItemController();
