@@ -3,7 +3,7 @@ const ApiError = require('../error/ApiError')
 class TypeController {
     async create (req,res,next) {
         const {name} = req.body
-        const checkType = await Type.findOne({where:name})
+        const checkType = await Type.findOne({where:{name}})
         if(checkType) {
             return next(ApiError.badRequest("Тип с таким именем уже существует"))
         }
