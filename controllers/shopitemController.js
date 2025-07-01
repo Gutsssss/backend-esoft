@@ -72,6 +72,31 @@ class ShopItemController {
       return next(ApiError.internal("Произошла ошибка при поиске товаров"));
     }
   }
+  async editProduct(req,res,next) {
+    try {
+      const {  id, name, price, brandId, typeId, info, img } = req.body;
+      if(!id || !name || !price || !brandId || !typeId) {
+        return next(ApiError.badRequest('Не все обязательные поля указаны'))
+      }
+      const existingItem = await ShopItem.findByPk(id)
+      if(!existingItem) {
+        return next(ApiError.badRequest('Товар не найден'))
+      }
+      const [affectedCoun,[updatedItem]] = await ShopItem.update(
+        {id, name, price, brandId, typeId, info, img},
+        {
+          where:{id},
+        }
+      )
+      if(affectedCoun) {
+        return next(ApiError.badRequest('Не удалось изменить товар'))
+      }
+        return res.json(updatedItem)
+    }
+    catch(err) {
+      return next(ApiError.badRequest('Не удалось изменить продукт',err))
+    }
+  }
   async getAll(req, res) {
     let { brandId, typeId, limit, page } = req.query;
     page = page || 1;
