@@ -74,8 +74,14 @@ class ShopItemController {
   }
   async editProduct(req,res,next) {
     try {
-      const {  id, name, price, brandId, typeId, info, img } = req.body;
-      if(!id || !name || !price || !brandId || !typeId) {
+      const {  id, name, price, brandId, typeId, info } = req.body;
+      const { img } = req.files || {};
+      if (!img) {
+        return next(ApiError.badRequest("Файл не указан"));
+      }
+      let filename = uuid.v4() + ".jpg";
+      await img.mv(path.resolve(__dirname, "..", "static", filename));
+      if(!name || !price || !brandId || !typeId) {
         return next(ApiError.badRequest('Не все обязательные поля указаны'))
       }
       const existingItem = await ShopItem.findByPk(id)
@@ -83,7 +89,7 @@ class ShopItemController {
         return next(ApiError.badRequest('Товар не найден'))
       }
       const [affectedCoun,[updatedItem]] = await ShopItem.update(
-        {id, name, price, brandId, typeId, info, img},
+        {name, price, brandId, typeId, info, img:filename},
         {
           where:{id},
         }
