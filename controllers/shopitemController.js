@@ -72,37 +72,48 @@ class ShopItemController {
       return next(ApiError.internal("Произошла ошибка при поиске товаров"));
     }
   }
-  async editProduct(req,res,next) {
-    try {
-      const {  id, name, price, brandId, typeId, info } = req.body;
-      const { img } = req.files || {};
-      if (!img) {
-        return next(ApiError.badRequest("Файл не указан"));
-      }
-      let filename = uuid.v4() + ".jpg";
+  async editProduct(req, res, next) {
+  try {
+    const { id, name, price, brandId, typeId, info } = req.body;
+    const { img } = req.files || {};
+    if (!name || !price || !brandId || !typeId) {
+      return next(ApiError.badRequest('Не все обязательные поля указаны'));
+    }
+    const existingItem = await ShopItem.findByPk(id);
+    if (!existingItem) {
+      return next(ApiError.badRequest('Товар не найден'));
+    }
+    const updateData = {
+      name,
+      price,
+      brandId,
+      typeId,
+      info
+    };
+    if (img) {
+      const filename = uuid.v4() + ".jpg";
       await img.mv(path.resolve(__dirname, "..", "static", filename));
-      if(!name || !price || !brandId || !typeId) {
-        return next(ApiError.badRequest('Не все обязательные поля указаны'))
+      updateData.img = filename;
+      if (existingItem.img) {
+        fs.unlinkSync(path.resolve(__dirname, "..", "static", existingItem.img));
       }
-      const existingItem = await ShopItem.findByPk(id)
-      if(!existingItem) {
-        return next(ApiError.badRequest('Товар не найден'))
-      }
-      const [affectedCoun,[updatedItem]] = await ShopItem.update(
-        {name, price, brandId, typeId, info, img:filename},
-        {
-          where:{id},
-        }
-      )
-      if(affectedCoun) {
-        return next(ApiError.badRequest('Не удалось изменить товар'))
-      }
-        return res.json(updatedItem)
     }
-    catch(err) {
-      return next(ApiError.badRequest('Не удалось изменить продукт',err))
+    const [affectedCount] = await ShopItem.update(updateData, {
+      where: { id },
+      returning: true 
+    });
+
+    if (affectedCount === 0) {
+      return next(ApiError.badRequest('Не удалось изменить товар'));
     }
+    const updatedItem = await ShopItem.findByPk(id);
+    return res.json(updatedItem);
+
+  } catch (err) {
+    console.error('Ошибка при изменении продукта:', err);
+    return next(ApiError.badRequest('Не удалось изменить продукт', err));
   }
+}
   async getAll(req, res) {
     let { brandId, typeId, limit, page } = req.query;
     page = page || 1;
