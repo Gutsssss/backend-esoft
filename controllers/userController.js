@@ -2,7 +2,7 @@ const ApiError = require("../error/ApiError");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { User, Basket, ShopItem, BasketItem,BlackListedToken } = require("../models/models");
-
+const sequelize = require('../db')
 const generateJwt = (id, email, role) => {
   return jwt.sign({ id, email, role }, process.env.SECRET_KEY, {
     expiresIn: "24h",
@@ -34,62 +34,81 @@ class UserController {
     
   }
   async addToBasket(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { name } = req.body;
-
-      if (!id) {
-        return next(ApiError.badRequest("Пользователь не найден"));
-      }
-      const user = await User.findOne({ 
-        where: { id },
-        include: [{
-          model: Basket,
-          include: [BasketItem]
-        }]
-      });
-
-      if (!user) {
-        return next(ApiError.badRequest("Пользователь не найден"));
-      }
-      let basket = user.Basket;
-      if (!basket) {
-        basket = await Basket.create({ userId: id });
-      }
-      const item = await ShopItem.findOne({ where: { name } });
-      if (!item) {
-        return next(ApiError.badRequest("Товар не найден"));
-      }
-      const existingItem = await BasketItem.findOne({
-        where: {
-          basketId: basket.id,
-          shopItemId: item.id
-        }
-      });
-
-      if (existingItem) {
-        return next(ApiError.badRequest("Товар уже в корзине"));
-      }
-      await BasketItem.create({
-        basketId: basket.id,
-        shopItemId: item.id
-      });
-      const updatedUser = await User.findOne({
-        where: { id },
-        include: [{
-          model: Basket,
-          include: [{
-            model: BasketItem,
-            include: [ShopItem]
-          }]
-        }]
-      });
-
-      return res.json(updatedUser);
-    } catch (err) {
-      console.error(err);
-      return next(ApiError.internal("Что то пошло не так"));
+  let transaction;
+  try {
+    transaction = await sequelize.transaction();
+    
+    const { id } = req.params;
+    const { items } = req.body;
+    if (!id || !items || !Array.isArray(items) || items.length === 0) {
+      await transaction.rollback();
+      return next(ApiError.badRequest("Не указаны ID пользователя или список товаров"));
     }
+    const user = await User.findByPk(id, { transaction });
+    if (!user) {
+      await transaction.rollback();
+      return next(ApiError.notFound("Пользователь не найден"));
+    }
+    let basket = await Basket.findOne({ 
+      where: { userId: id },
+      transaction
+    });
+    
+    if (!basket) {
+      basket = await Basket.create({ userId: id }, { transaction });
+    }
+    const itemNames = items.map(item => item.name);
+    const shopItems = await ShopItem.findAll({ 
+      where: { name: itemNames },
+      transaction
+    });
+    if (shopItems.length !== items.length) {
+      const foundNames = shopItems.map(item => item.name);
+      const notFoundItems = items.filter(item => !foundNames.includes(item.name));
+      
+      await transaction.rollback();
+      return next(ApiError.notFound(
+        `Следующие товары не найдены: ${notFoundItems.map(item => item.name).join(', ')}`
+      ));
+    }
+    const existingItems = await BasketItem.findAll({
+      where: {
+        basketId: basket.id,
+        shopItemId: shopItems.map(item => item.id)
+      },
+      transaction
+    });
+
+    if (existingItems.length > 0) {
+      const existingItemIds = existingItems.map(item => item.shopItemId);
+      const existingShopItems = shopItems.filter(item => existingItemIds.includes(item.id));
+      
+      await transaction.rollback();
+      return next(ApiError.badRequest(
+        `Следующие товары уже в корзине: ${existingShopItems.map(item => item.name).join(', ')}`
+      ));
+    }
+    await BasketItem.bulkCreate(
+      shopItems.map(shopItem => ({
+        basketId: basket.id,
+        shopItemId: shopItem.id,
+        quantity: items.find(item => item.name === shopItem.name).quantity || 1
+      })),
+      { transaction }
+    );
+    await transaction.commit();
+    return res.status(200).json({
+      success: true,
+      message: "Товары успешно добавлены в корзину",
+      count: shopItems.length
+    });
+
+  } catch (err) {
+    if (transaction) await transaction.rollback();
+    
+    console.error('Ошибка в addToBasket:', err);
+    return next(ApiError.internal("Ошибка сервера при добавлении в корзину"));
+  }
 }
   async login(req, res, next) {
     try {
