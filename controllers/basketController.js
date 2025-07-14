@@ -88,16 +88,12 @@ async removeFromBasket(req, res, next) {
       }]
     });
     const items = updatedBasket?.basket_items || [];
-    const totalPrice = items.reduce((sum, item) => {
-      return sum + (item.ShopItem.price * item.quantity);
-    }, 0);
 
     return res.status(200).json({
       success: true,
       message: "Товар успешно удален из корзины",
       items,
       totalItems: items.length,
-      totalPrice
     });
 
   } catch (err) {
