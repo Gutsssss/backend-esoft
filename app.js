@@ -16,21 +16,9 @@ const allowedOrigins = [
 const PORT = process.env.PORT || 3000
 const app = express()
 app.use(cors({
-  origin: function (origin, callback) {
-    // Разрешаем запросы без origin (например, из Postman)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: true,
   credentials: true
 }));
-app.options('*', cors());
 app.use(express.json())
 app.use(express.static(path.resolve(__dirname,'static')))
 app.use(fileUpload({}))
