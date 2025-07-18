@@ -1,7 +1,7 @@
 const ApiError = require("../error/ApiError");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { User, Basket, ShopItem, BasketItem,BlackListedToken } = require("../models/models");
+const { User, Basket, ShopItem, BasketItem,BlackListedToken,Comment } = require("../models/models");
 const sequelize = require('../db')
 const generateJwt = (id, email, role) => {
   return jwt.sign({ id, email, role }, process.env.SECRET_KEY, {
@@ -146,7 +146,32 @@ class UserController {
   async check(req, res, next) {
     const token = generateJwt(req.user.id, req.user.email, req.user.role);
     return res.json({ token });
-  }
+}
+async createComment(req, res,next) {
+    try {
+        const { userId, itemId, text, rating } = req.body;
+        
+        // Проверяем, оставлял ли пользователь уже комментарий к этому товару
+        const existingComment = await Comment.findOne({
+            where: { userId, shopItemId: itemId }
+        });
+        
+        if (existingComment) {
+            return next(ApiError.badRequest('Вы уже оставляли комментарий'))
+        }
+        
+        const comment = await Comment.create({
+            text,
+            rating,
+            userId,
+            shopItemId: itemId
+        });
+        
+        res.status(201).json(comment);
+    } catch (e) {
+        next(ApiError.internal('Ошибка при создании'))
+    }
+}
 }
 
 module.exports = new UserController();

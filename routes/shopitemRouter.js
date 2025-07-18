@@ -8,6 +8,7 @@ router.get('/',shopItemController.getAll)
 router.post('/edit',checkRoleMiddleware('ADMIN'),shopItemController.editProduct)
 router.get('/search/:name', shopItemController.searchItems);
 router.get('/:id',shopItemController.getOne)
+router.get('/:id/comments', shopItemController.getItemComments);
 router.delete('/:id',checkRoleMiddleware("ADMIN"),shopItemController.delete)
 
 module.exports = router
