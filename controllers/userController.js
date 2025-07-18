@@ -1,8 +1,8 @@
 const ApiError = require("../error/ApiError");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { User, Basket, ShopItem, BasketItem,BlackListedToken } = require("../models/models");
-
+const { User, Basket, ShopItem, BasketItem,BlackListedToken,Comment } = require("../models/models");
+const sequelize = require('../db')
 const generateJwt = (id, email, role) => {
   return jwt.sign({ id, email, role }, process.env.SECRET_KEY, {
     expiresIn: "24h",
@@ -34,76 +34,81 @@ class UserController {
     
   }
   async addToBasket(req, res, next) {
-    try {
-      const { id } = req.params; // User ID
-      const { name } = req.body; // Product name
-
-      if (!id) {
-        return next(ApiError.badRequest("Пользователь не найден"));
-      }
-
-      // Find the user and their basket
-      const user = await User.findOne({ 
-        where: { id },
-        include: [{
-          model: Basket,
-          include: [BasketItem]
-        }]
-      });
-
-      if (!user) {
-        return next(ApiError.badRequest("Пользователь не найден"));
-      }
-
-      // Find or create the user's basket
-      let basket = user.Basket;
-      if (!basket) {
-        basket = await Basket.create({ userId: id });
-      }
-
-      // Find the shop item
-      const item = await ShopItem.findOne({ where: { name } });
-      if (!item) {
-        return next(ApiError.badRequest("Товар не найден"));
-      }
-
-      // Check if item already exists in basket
-      const existingItem = await BasketItem.findOne({
-        where: {
-          basketId: basket.id,
-          shopItemId: item.id
-        }
-      });
-
-      if (existingItem) {
-        // If item exists, you might want to increment quantity or return error
-        return next(ApiError.badRequest("Товар уже в корзине"));
-      }
-
-      // Add item to basket
-      await BasketItem.create({
-        basketId: basket.id,
-        shopItemId: item.id
-        // You can add quantity or other fields here if needed
-      });
-
-      // Return updated user with basket and items
-      const updatedUser = await User.findOne({
-        where: { id },
-        include: [{
-          model: Basket,
-          include: [{
-            model: BasketItem,
-            include: [ShopItem] // Include the shop item details
-          }]
-        }]
-      });
-
-      return res.json(updatedUser);
-    } catch (err) {
-      console.error(err);
-      return next(ApiError.internal("Что то пошло не так"));
+  let transaction;
+  try {
+    transaction = await sequelize.transaction();
+    
+    const { id } = req.params;
+    const { items } = req.body;
+    if (!id || !items || !Array.isArray(items) || items.length === 0) {
+      await transaction.rollback();
+      return next(ApiError.badRequest("Не указаны ID пользователя или список товаров"));
     }
+    const user = await User.findByPk(id, { transaction });
+    if (!user) {
+      await transaction.rollback();
+      return next(ApiError.notFound("Пользователь не найден"));
+    }
+    let basket = await Basket.findOne({ 
+      where: { userId: id },
+      transaction
+    });
+    
+    if (!basket) {
+      basket = await Basket.create({ userId: id }, { transaction });
+    }
+    const itemNames = items.map(item => item.name);
+    const shopItems = await ShopItem.findAll({ 
+      where: { name: itemNames },
+      transaction
+    });
+    if (shopItems.length !== items.length) {
+      const foundNames = shopItems.map(item => item.name);
+      const notFoundItems = items.filter(item => !foundNames.includes(item.name));
+      
+      await transaction.rollback();
+      return next(ApiError.notFound(
+        `Следующие товары не найдены: ${notFoundItems.map(item => item.name).join(', ')}`
+      ));
+    }
+    const existingItems = await BasketItem.findAll({
+      where: {
+        basketId: basket.id,
+        shopItemId: shopItems.map(item => item.id)
+      },
+      transaction
+    });
+
+    if (existingItems.length > 0) {
+      const existingItemIds = existingItems.map(item => item.shopItemId);
+      const existingShopItems = shopItems.filter(item => existingItemIds.includes(item.id));
+      
+      await transaction.rollback();
+      return next(ApiError.badRequest(
+        `Следующие товары уже в корзине: ${existingShopItems.map(item => item.name).join(', ')}`
+      ));
+    }
+    await BasketItem.bulkCreate(
+      shopItems.map(shopItem => ({
+        basketId: basket.id,
+        shopItemId: shopItem.id,
+        quantity: items.find(item => item.name === shopItem.name).quantity || 1
+      })),
+      { transaction }
+    );
+    await transaction.commit();
+    return res.status(200).json({
+      success: true,
+      message: "Товары успешно добавлены в корзину",
+      count: shopItems.length
+    });
+
+  } catch (err) {
+    if (transaction) await transaction.rollback();
+    
+    console.error('Ошибка в addToBasket:', err);
+    return next(ApiError.internal("Ошибка сервера при добавлении в корзину"));
+  }
 }
   async login(req, res, next) {
     try {
@@ -141,7 +146,32 @@ class UserController {
   async check(req, res, next) {
     const token = generateJwt(req.user.id, req.user.email, req.user.role);
     return res.json({ token });
-  }
+}
+async createComment(req, res,next) {
+    try {
+        const { userId, itemId, text, rating } = req.body;
+        
+        // Проверяем, оставлял ли пользователь уже комментарий к этому товару
+        const existingComment = await Comment.findOne({
+            where: { userId, shopItemId: itemId }
+        });
+        
+        if (existingComment) {
+            return next(ApiError.badRequest('Вы уже оставляли комментарий'))
+        }
+        
+        const comment = await Comment.create({
+            text,
+            rating,
+            userId,
+            shopItemId: itemId
+        });
+        
+        res.status(201).json(comment);
+    } catch (e) {
+        next(ApiError.internal('Ошибка при создании'))
+    }
+}
 }
 
 module.exports = new UserController();
