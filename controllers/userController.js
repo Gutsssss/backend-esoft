@@ -124,7 +124,8 @@ class UserController {
     const token = generateJwt(user.id, user.email, user.role);
     return res.json({ token });
   } catch (err) {
-    return next(ApiError.internal("Что то пошло не так"))
+    console.error('Login error:', err);
+        return next(ApiError.internal(err.message || "Что то пошло не так"));
   }
     }
   async logout(req, res, next) {
