@@ -46,29 +46,30 @@ class ShopItemController {
     }
   }
   async searchItems(req, res, next) {
-    try {
-      const { name } = req.params;
-
-      // Проверка на пустой запрос
-      if (!name || name.trim() === "") {
-        return res.status(200).json([]);
-      }
-
-      const items = await ShopItem.findAll({
-        where: {
-          name: {
-            [Op.iLike]: `%${name}%`,
-          },
-        },
-        include: [{ model: ItemInfo, as: "info" }],
-      });
-
-      return res.json(items);
-    } catch (err) {
-      console.error("Ошибка поиска:", err);
-      return next(ApiError.internal("Произошла ошибка при поиске товаров"));
+  try {
+    let { name } = req.query;
+    name = typeof name === 'string' ? decodeURIComponent(name) : name;
+    
+    if (!name || name.trim() === "") {
+      return res.json([]);
     }
+    await sequelize.query("SET NAMES 'utf8mb4'");
+    
+    const items = await ShopItem.findAll({
+      where: {
+        name: {
+          [Op.iLike]: `%${name}%`,
+        },
+      },
+      include: [{ model: ItemInfo, as: "info" }],
+    });
+
+    return res.json(items);
+  } catch (err) {
+    console.error("Ошибка поиска:", err);
+    return next(ApiError.internal("Ошибка поиска"));
   }
+}
   async editProduct(req, res, next) {
   try {
     const { id, name, price, brandId, typeId, info } = req.body;
@@ -188,11 +189,15 @@ class ShopItemController {
             });
         }
 
+
         return res.json({
             success: true,
-            data: item.comments,
-            count: item.comments.length
+            data: {
+                comments: item.comments,
+                count: item.comments.length
+            }
         });
+
         
     } catch (e) {
         console.error('Ошибка в getItemComments:', e);

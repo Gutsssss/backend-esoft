@@ -102,14 +102,10 @@ ItemInfo.belongsTo(ShopItem)
 Type.belongsToMany(Brand,{through:TypeBrand})
 Brand.belongsToMany(Type,{through:TypeBrand})
 
+ShopItem.hasMany(Comment, { foreignKey: 'shopItemId' });
 
-ShopItem.addHook('afterSave', async (item, options) => {
-    const comments = await item.getComments();
-    if (comments.length > 0) {
-        const avgRating = comments.reduce((sum, comment) => sum + comment.rating, 0) / comments.length;
-        await item.update({ rating: avgRating.toFixed(1) }, { transaction: options.transaction });
-    }
-});
+Comment.belongsTo(ShopItem, { foreignKey: 'shopItemId' });
+
 
 module.exports  = {
     User,

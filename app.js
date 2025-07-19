@@ -8,11 +8,6 @@ const errorHandler = require('./middleware/ErrorHandlingMiddleware')
 const fileUpload = require('express-fileupload')
 const path = require('path')
 
-const allowedOrigins = [
-  'https://admin.mahikko-admin.ru',
-  'https://client.mahikko-admin.ru'
-];
-
 const PORT = process.env.PORT || 3000
 const app = express()
 app.use(cors({

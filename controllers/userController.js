@@ -159,8 +159,6 @@ class UserController {
 async createComment(req, res,next) {
     try {
         const { userId, itemId, text, rating } = req.body;
-        
-        // Проверяем, оставлял ли пользователь уже комментарий к этому товару
         const existingComment = await Comment.findOne({
             where: { userId, shopItemId: itemId }
         });

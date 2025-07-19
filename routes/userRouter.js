@@ -10,5 +10,6 @@ router.post('/logout', userController.logout)
 router.get('/auth',authMiddleware, userController.check)
 router.get('/:id/basket', basketController.getOne)
 router.post('/:id/add', userController.addToBasket)
+router.post('/comment', authMiddleware,userController.createComment)
 
 module.exports = router
