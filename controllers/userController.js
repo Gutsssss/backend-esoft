@@ -4,9 +4,17 @@ const jwt = require("jsonwebtoken");
 const { User, Basket, ShopItem, BasketItem,BlackListedToken,Comment } = require("../models/models");
 const sequelize = require('../db')
 const generateJwt = (id, email, role) => {
-  return jwt.sign({ id, email, role }, process.env.SECRET_KEY, {
-    expiresIn: "24h",
-  });
+  const secret = process.env.JWT_SECRET;
+  
+  if (!secret) {
+    throw new Error("JWT_SECRET is not defined in environment variables");
+  }
+
+  return jwt.sign(
+    { id, email, role },
+    secret,
+    { expiresIn: '24h' }
+  );
 };
 
 class UserController {
